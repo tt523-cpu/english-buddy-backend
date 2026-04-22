@@ -119,9 +119,10 @@ class Config:
                     k, _, v = line.partition("=")
                     existing[k.strip()] = v.strip()
 
-        # Apply updates
+        # Apply updates (skip masked/placeholder values to avoid overwriting real keys)
+        MASK_PATTERN = ("***", "(empty)")
         for k, v in updates.items():
-            if v is not None:
+            if v is not None and str(v).strip() and not str(v).startswith(MASK_PATTERN):
                 existing[k] = str(v)
 
         # Write .env
@@ -202,8 +203,13 @@ def _stt_headers():
 
 @app.route("/api/config", methods=["GET"])
 def get_config():
-    """Get current config (keys are masked for security)."""
-    return jsonify(cfg.to_dict(mask_keys=True))
+    """Get current config (keys are NOT returned to browser for security)."""
+    d = dict(cfg._data)
+    # Never send real API keys to browser - send placeholder
+    for key in ("LLM_API_KEY", "STT_API_KEY"):
+        if d.get(key):
+            d[key] = f"***{d[key][-4:]}"
+    return jsonify(d)
 
 
 @app.route("/api/config", methods=["POST"])
@@ -616,10 +622,19 @@ async function loadConfig() {
     const data = await resp.json();
     if (data.LLM_BASE_URL) document.getElementById('llmBaseUrl').value = data.LLM_BASE_URL;
     if (data.LLM_MODEL) document.getElementById('llmModel').value = data.LLM_MODEL;
-    if (data.LLM_API_KEY) document.getElementById('llmApiKey').value = data.LLM_API_KEY;
+    // API keys: show masked value in placeholder, keep input empty
+    const llmKeyEl = document.getElementById('llmApiKey');
+    if (data.LLM_API_KEY && data.LLM_API_KEY.startsWith('***')) {
+      llmKeyEl.value = '';
+      llmKeyEl.placeholder = data.LLM_API_KEY + ' (already set, leave blank to keep)';
+    }
+    const sttKeyEl = document.getElementById('sttApiKey');
+    if (data.STT_API_KEY && data.STT_API_KEY.startsWith('***')) {
+      sttKeyEl.value = '';
+      sttKeyEl.placeholder = data.STT_API_KEY + ' (already set, leave blank to keep)';
+    }
     if (data.STT_BASE_URL) document.getElementById('sttBaseUrl').value = data.STT_BASE_URL;
     if (data.STT_MODEL) document.getElementById('sttModel').value = data.STT_MODEL;
-    if (data.STT_API_KEY) document.getElementById('sttApiKey').value = data.STT_API_KEY;
     if (data.STT_TRANSCRIBE_PATH) document.getElementById('sttTranscribePath').value = data.STT_TRANSCRIBE_PATH;
     if (data.STT_HEALTH_PATH) document.getElementById('sttHealthPath').value = data.STT_HEALTH_PATH;
 
