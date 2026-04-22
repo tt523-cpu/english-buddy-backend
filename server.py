@@ -59,30 +59,53 @@ load_dotenv(ENV_FILE)
 # Config Management
 # ============================================================
 class Config:
-    """Runtime config that can be hot-reloaded from .env file."""
+    """Runtime config that reads from data/.env file on every access."""
 
     def __init__(self):
         self._data = {}
+        self._file_mtime = 0
         self.reload()
 
+    def _read_env_file(self):
+        """Directly parse data/.env file into a dict (no env var caching)."""
+        values = {}
+        if os.path.isfile(ENV_FILE):
+            for line in open(ENV_FILE, "r", encoding="utf-8"):
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, _, v = line.partition("=")
+                    values[k.strip()] = v.strip()
+        return values
+
     def reload(self):
-        """Reload config from .env file (or environment variables)."""
-        load_dotenv(ENV_FILE, override=True)
+        """Reload config from .env file."""
+        raw = self._read_env_file()
         self._data = {
-            "LLM_BASE_URL": os.environ.get("LLM_BASE_URL", "https://api.deepseek.com").rstrip("/"),
-            "LLM_API_KEY": os.environ.get("LLM_API_KEY", ""),
-            "LLM_MODEL": os.environ.get("LLM_MODEL", "deepseek-chat"),
-            "STT_BASE_URL": os.environ.get("STT_BASE_URL", "https://api.groq.com/openai/v1").rstrip("/"),
-            "STT_API_KEY": os.environ.get("STT_API_KEY", ""),
-            "STT_MODEL": os.environ.get("STT_MODEL", "whisper-large-v3"),
-            "STT_TRANSCRIBE_PATH": os.environ.get("STT_TRANSCRIBE_PATH", "/audio/transcriptions"),
-            "STT_HEALTH_PATH": os.environ.get("STT_HEALTH_PATH", "/models"),
-            "HOST": os.environ.get("HOST", "0.0.0.0"),
-            "PORT": os.environ.get("PORT", "5000"),
-            "DEBUG": os.environ.get("DEBUG", "false"),
+            "LLM_BASE_URL": raw.get("LLM_BASE_URL", "https://api.deepseek.com").rstrip("/"),
+            "LLM_API_KEY": raw.get("LLM_API_KEY", ""),
+            "LLM_MODEL": raw.get("LLM_MODEL", "deepseek-chat"),
+            "STT_BASE_URL": raw.get("STT_BASE_URL", "https://api.groq.com/openai/v1").rstrip("/"),
+            "STT_API_KEY": raw.get("STT_API_KEY", ""),
+            "STT_MODEL": raw.get("STT_MODEL", "whisper-large-v3"),
+            "STT_TRANSCRIBE_PATH": raw.get("STT_TRANSCRIBE_PATH", "/audio/transcriptions"),
+            "STT_HEALTH_PATH": raw.get("STT_HEALTH_PATH", "/models"),
+            "HOST": raw.get("HOST", "0.0.0.0"),
+            "PORT": raw.get("PORT", "5000"),
+            "DEBUG": raw.get("DEBUG", "false"),
         }
+        try:
+            self._file_mtime = os.path.getmtime(ENV_FILE)
+        except OSError:
+            pass
 
     def get(self, key, default=""):
+        # Auto-reload if file changed (handles multi-worker sync)
+        try:
+            mtime = os.path.getmtime(ENV_FILE)
+            if mtime != self._file_mtime:
+                self.reload()
+        except OSError:
+            pass
         return self._data.get(key, default)
 
     def save(self, updates: dict):
