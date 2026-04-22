@@ -40,8 +40,16 @@ from dotenv import load_dotenv, dotenv_values
 # Paths
 # ============================================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ENV_FILE = os.path.join(BASE_DIR, ".env")
+DATA_DIR = os.environ.get("DATA_DIR", os.path.join(BASE_DIR, "data"))
+os.makedirs(DATA_DIR, exist_ok=True)
+ENV_FILE = os.path.join(DATA_DIR, ".env")
 ENV_EXAMPLE = os.path.join(BASE_DIR, ".env.example")
+
+# Auto-create .env from .env.example on first run
+if not os.path.isfile(ENV_FILE) and os.path.isfile(ENV_EXAMPLE):
+    import shutil
+    shutil.copy2(ENV_EXAMPLE, ENV_FILE)
+    print(f"[init] Created {ENV_FILE} from .env.example")
 
 # Load initial config
 load_dotenv(ENV_FILE)

@@ -1,15 +1,12 @@
 # ============================================================
 # English Buddy Backend - Docker Compose
 #
-# Deploy:
-#   1. cp .env.example .env
-#   2. Edit .env with your API keys
-#   3. docker compose up -d
-#   4. Open http://your-server-ip:5000
+# One-command deploy:
+#   docker compose up -d
+#   Then open http://your-server-ip:5000/admin to configure API keys
 #
 # With frontend:
 #   Put your Flutter Web build in ./web/ directory
-#   Then docker compose up -d
 # ============================================================
 
 services:
@@ -19,7 +16,10 @@ services:
     ports:
       - "${PORT:-5000}:5000"
     env_file:
-      - .env
+      - path: .env
+        required: false
+    volumes:
+      - ./data:/app/data
     restart: unless-stopped
     logging:
       driver: json-file

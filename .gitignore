@@ -1,5 +1,6 @@
 # Environment (contains API keys!)
 .env
+data/
 
 # Python
 __pycache__/
@@ -18,6 +19,3 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
-
-# Frontend (built separately)
-web/

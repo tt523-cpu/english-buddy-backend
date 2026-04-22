@@ -16,14 +16,19 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy backend code
 COPY server.py .
+COPY .env.example .
 
-# Copy frontend (optional - if build/web exists)
-# If no frontend, the API endpoints still work
-COPY web/ /app/web/ 2>/dev/null || true
+# Create data dir for persistent config
+RUN mkdir -p /app/data /app/web
+
+# Copy frontend if it exists
+# Before building, run: flutter build web --release && cp -r build/web/ backend/web/
+COPY web* /app/web/
 
 # Environment
 ENV PYTHONUNBUFFERED=1
 ENV STATIC_DIR=/app/web
+ENV DATA_DIR=/app/data
 
 EXPOSE 5000
 

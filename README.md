@@ -1,113 +1,67 @@
 # English Buddy Backend
 
-后端 API 代理服务器，为 English Buddy 英语学习 App 提供 AI 服务。
+> AI API 代理后端，支持 Web 管理页面配置，一键 Docker 部署。
 
-**核心功能**：API Key 全部存在服务端，前端无需配置，开箱即用。
-
-## Quick Deploy
+## 一键部署
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/english-buddy-backend.git
+git clone https://github.com/tt523-cpu/english-buddy-backend.git
 cd english-buddy-backend
-
-cp .env.example .env
-# 编辑 .env 填入你的 API Key
-
 docker compose up -d
-# 打开 http://服务器IP:5000
 ```
 
-## API Endpoints
+然后打开 **http://服务器IP:5000/admin** 在网页里配置 API Key。
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/status` | 后端健康检查 + 配置信息 |
-| GET | `/api/v1/models` | 获取可用 LLM 模型列表 |
-| POST | `/api/v1/chat/completions` | AI 对话代理 |
-| GET | `/api/stt/health` | 语音识别健康检查 |
-| POST | `/api/stt/transcribe` | 语音转文字代理 |
+## 支持的 AI 服务
 
-## 配置 AI 服务
+| 服务 | 类型 | 说明 |
+|------|------|------|
+| DeepSeek | LLM | 推荐使用，性价比高 |
+| OpenAI | LLM | GPT-4o / GPT-4o-mini |
+| Kimi (月之暗面) | LLM | Moonshot-v1 系列 |
+| GLM (智谱) | LLM | GLM-4 系列 |
+| Ollama | LLM | 本地部署模型 |
+| Groq | STT | **免费**语音识别 |
+| OpenAI | STT | Whisper |
+| SiliconFlow | STT | SenseVoice |
 
-编辑 `.env` 文件：
+## 目录结构
 
-### LLM（AI 对话 / 翻译）
-
-| 服务商 | LLM_BASE_URL | LLM_MODEL | 费用 |
-|--------|-------------|-----------|------|
-| **DeepSeek** | `https://api.deepseek.com` | `deepseek-chat` | ~¥1/百万token |
-| OpenAI | `https://api.openai.com` | `gpt-4o-mini` | 较贵 |
-| Kimi | `https://api.moonshot.cn` | `moonshot-v1-8k` | 有免费额度 |
-| GLM | `https://open.bigmodel.cn/api/paas/v4` | `glm-4-flash` | 有免费额度 |
-| 本地 Ollama | `http://host.docker.internal:11434` | `llama3.2:latest` | 免费 |
-
-### STT（语音识别）
-
-| 服务商 | STT_BASE_URL | STT_MODEL | 费用 |
-|--------|-------------|-----------|------|
-| **Groq** | `https://api.groq.com/openai/v1` | `whisper-large-v3` | **免费** |
-| OpenAI | `https://api.openai.com/v1` | `whisper-1` | $0.006/分钟 |
-| SiliconFlow | `https://api.siliconflow.cn/v1` | `FunAudioLLM/SenseVoiceSmall` | 每天100次免费 |
-| 本地 Whisper | `http://host.docker.internal:18000` | _(空)_ | 免费 |
-
-## 挂载前端
-
-把 Flutter Web 构建产物放到 `web/` 目录：
-
-```bash
-# Flutter 项目里构建
-flutter build web --release
-
-# 复制到后端
-cp -r build/web/* /path/to/english-buddy-backend/web/
-
-# 重启
-docker compose restart
+```
+english-buddy-backend/
+├── server.py          # 后端服务（Flask）
+├── requirements.txt   # Python 依赖
+├── Dockerfile         # Docker 镜像
+├── docker-compose.yml # Docker Compose
+├── .env.example       # 配置模板
+├── data/              # 持久化数据（Docker 卷挂载）
+│   └── .env           # 运行时配置（自动生成）
+└── web/               # 前端静态文件（放 Flutter 构建产物）
 ```
 
-或者用 volume 挂载（修改 docker-compose.yml）：
+## API 接口
 
-```yaml
-volumes:
-  - ./web:/app/web:ro
-```
-
-## 测试
-
-```bash
-# 检查后端
-curl http://localhost:5000/api/status
-
-# 测试 LLM
-curl -X POST http://localhost:5000/api/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{"messages":[{"role":"user","content":"Hello!"}],"max_tokens":50}'
-
-# 检查 STT
-curl http://localhost:5000/api/stt/health
-```
+| Endpoint | 说明 |
+|----------|------|
+| `GET /admin` | Web 管理页面 |
+| `GET /api/config` | 读取配置（Key 脱敏） |
+| `POST /api/config` | 保存配置 |
+| `POST /api/test/llm` | 测试 LLM 连接 |
+| `POST /api/test/stt` | 测试 STT 连接 |
+| `GET /api/status` | 健康检查 |
+| `POST /api/v1/chat/completions` | LLM 对话代理 |
+| `GET /api/v1/models` | 模型列表 |
+| `POST /api/stt/transcribe` | 语音转文字代理 |
 
 ## 常用命令
 
 ```bash
-docker compose logs -f       # 查看日志
-docker compose restart       # 重启
-docker compose down          # 停止
-docker compose up -d --build # 代码更新后重建
-```
+# 查看日志
+docker compose logs -f
 
-## Architecture
+# 重启
+docker compose restart
 
-```
-Browser / App
-    │
-    ▼
-┌──────────────────────────┐
-│   English Buddy Backend   │  ← This server (Flask + Docker)
-│   Port 5000               │
-│                            │
-│  /api/v1/chat/completions │──→ DeepSeek / OpenAI / Ollama
-│  /api/stt/transcribe      │──→ Groq / OpenAI / Whisper
-│  /                         │──→ Flutter Web (static files)
-└──────────────────────────┘
+# 更新代码
+git pull && docker compose up -d --build
 ```
