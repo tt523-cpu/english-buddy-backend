@@ -236,8 +236,16 @@ def test_llm():
     try:
         body = request.get_json(force=True) or {}
         base_url = body.get("base_url", cfg.get("LLM_BASE_URL")).rstrip("/")
-        api_key = body.get("api_key", cfg.get("LLM_API_KEY"))
+        api_key = body.get("api_key", "")
         model = body.get("model", cfg.get("LLM_MODEL"))
+
+        # If no real key provided (masked/empty), use saved key from file
+        if not api_key or api_key.startswith("***"):
+            api_key = cfg.get("LLM_API_KEY")
+        if not base_url:
+            base_url = cfg.get("LLM_BASE_URL")
+        if not model:
+            model = cfg.get("LLM_MODEL")
 
         headers = {"Content-Type": "application/json"}
         if api_key:
@@ -274,9 +282,13 @@ def test_stt():
     """Test STT connection with current or provided config."""
     try:
         body = request.get_json(force=True) or {}
-        base_url = body.get("base_url", cfg.get("STT_BASE_URL")).rstrip("/")
-        api_key = body.get("api_key", cfg.get("STT_API_KEY"))
+        base_url = body.get("base_url", "").rstrip("/") or cfg.get("STT_BASE_URL")
+        api_key = body.get("api_key", "")
         health_path = body.get("health_path", cfg.get("STT_HEALTH_PATH"))
+
+        # If no real key provided (masked/empty), use saved key from file
+        if not api_key or api_key.startswith("***"):
+            api_key = cfg.get("STT_API_KEY")
 
         headers = {"Content-Type": "application/json"}
         if api_key:
